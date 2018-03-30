@@ -41,10 +41,14 @@ optional arguments:
 ->
 ```
 LOGGING IN TO FRITZ!BOX AT http://fritz.box...
-QUERYING DEVICES...
-landevice5007    android-1234567890123456 [not active]
-landevice6494    my kid's iphone
-landevice5006    Chromecast
+FETCHING AVAILABLE PROFILES...
+FETCHING DEVICES...
+FETCHING DEVICE PROFILES...
+
+DEVICE_ID        PROFILE_ID       DEVICE_NAME
+landevice5007    filtprof1        android-1234567890123456 [NOT ACTIVE]
+landevice6494    filtprof1        my kid's iphone
+landevice5006    filtprof2        Chromecast
 ...
 ```
 
@@ -55,11 +59,15 @@ landevice5006    Chromecast
 ->
 ```
 LOGGING IN TO FRITZ!BOX AT http://fritz.box...
-QUERYING PROFILES...
+FETCHING AVAILABLE PROFILES...
+FETCHING DEVICES...
+FETCHING DEVICE PROFILES...
+
+PROFILE_ID       PROFILE_NAME
 filtprof1        Standard
 filtprof2        Gast
-filtprof3        UnbeschrÃ¤nkt
-filtprof4        Gesperrt 
+filtprof3        Unbeschränkt
+filtprof4        Gesperrt
 ```
 
 3. Actually change the profiles
@@ -69,11 +77,19 @@ filtprof4        Gesperrt
 ->
 ```
 LOGGING IN TO FRITZ!BOX AT http://fritz.box...
+FETCHING AVAILABLE PROFILES...
+FETCHING DEVICES...
+FETCHING DEVICE PROFILES...
+
 UPDATING DEVICE PROFILES...
-CHANGING PROFILE OF landevice6494 TO filtprof4
+  CHANGING PROFILE OF landevice6494/my kid's iphone TO filtprof4/Gesperrt
 ```
 
 Note that you may change the profiles of multiple devices at once by supplying multiple `DEVICE=PROFILE` pairs on the command line.
+
+## Known Issues
+
+- Non-uniquely named devices may confuse the script.
 
 ## License
 [MIT](https://github.com/flopp/fritz-switch-profiles/blob/master/LICENSE) &copy; 2018 Florian Pigorsch & contributors

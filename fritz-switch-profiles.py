@@ -18,6 +18,11 @@ class FritzProfileSwitch:
     def __init__(self, url, user, password):
         self.url = url
         self.sid = self.login(user, password)
+        self.profiles = []
+        self.devices = []
+        self.fetch_profiles()
+        self.fetch_devices()
+        self.fetch_device_profiles()
 
     def get_sid_challenge(self, url):
         r = requests.get(url, allow_redirects=True)
@@ -41,39 +46,132 @@ class FritzProfileSwitch:
             raise PermissionError('Cannot login to {} using the supplied credentials.'.format(self.url))
         return sid
 
-    def get_available_profiles(self):
+    def fetch_device_profiles(self):
+        print('FETCHING DEVICE PROFILES...')
+        data = {'xhr': 1, 'sid': self.sid, 'cancel': '', 'oldpage': '/internet/kids_userlist.lua'}
+        url = self.url + '/data.lua'
+        r = requests.post(url, data=data, allow_redirects=True)
+        html = lxml.html.fromstring(r.content)
+        for row in html.xpath('//table[@id="uiDevices"]/tr'):
+            td = row.xpath('td')
+            if (not td) or (len(td) != 5):
+                continue
+            select = td[3].xpath('select')
+            if not select:
+                continue
+            id2 = select[0].xpath('@name')[0].split(':')[1]
+            device_name = td[0].xpath('span/text()')[0]
+            profile = select[0].xpath('option[@selected]/@value')[0]
+            self.merge_device(device_name, id2, profile)
+
+    def merge_device(self, name, id2, profile):
+        multi = False
+        found = -1
+        for index, device in enumerate(self.devices):
+            if id2 == device['id1']:
+                if found >= 0:
+                    multi = True
+                found = index
+            elif name == device['name']:
+                if found >= 0:
+                    multi = True
+                found = index
+        if found < 0:
+            print('  NO MATCH FOR {:16} {}'.format(id2, name))
+        elif multi:
+            print('  MULTIPLE MATCHES FOR {:16} {}'.format(id2, name))
+        else:
+            if self.devices[found]['id1'] != id2:
+                self.devices[found]['id2'] = id2
+            self.devices[found]['profile'] = profile
+
+    def get_device(self, device_id):
+        for device in self.devices:
+            if device['id1'] == device_id or device['id2'] == device_id:
+                return device
+        return None
+
+    def get_profile(self, profile_id):
+        for profile in self.profiles:
+            if profile['id'] == profile_id:
+                return profile
+        return None
+
+    def fetch_devices(self):
+        print('FETCHING DEVICES...')
+        data = {'xhr': 1, 'sid': self.sid, 'no_sidrenew': '', 'page': 'netDev'}
+        url = self.url + '/data.lua'
+        r = requests.post(url, data=data, allow_redirects=True)
+        j = r.json()
+        self.devices = []
+        for device in j['data']['active']:
+            self.devices.append({
+                'name': device['name'],
+                'id1': device['UID'],
+                'id2': None,
+                'profile': None,
+                'active': True
+            })
+        for device in j['data']['passive']:
+            self.devices.append({
+                'name': device['name'],
+                'id1': device['UID'],
+                'id2': None,
+                'profile': None,
+                'active': False
+            })
+
+    def fetch_profiles(self):
+        print('FETCHING AVAILABLE PROFILES...')
         data = {'xhr': 1, 'sid': self.sid, 'no_sidrenew': '', 'page': 'kidPro'}
         url = self.url + '/data.lua'
         r = requests.post(url, data=data, allow_redirects=True)
         html = lxml.html.fromstring(r.content)
+        self.profiles = []
         for row in html.xpath('//table[@id="uiProfileList"]/tr'):
             profile_name = row.xpath('td[@class="name"]/span/text()')
             if not profile_name:
                 continue
             profile_name = profile_name[0]
             profile_id = row.xpath('td[@class="btncolumn"]/button[@name="edit"]/@value')[0]
-            print("{:16} {}".format(profile_id, profile_name))
+            self.profiles.append({'name': profile_name, 'id': profile_id})
 
-    def get_available_devices(self):
-        data = {'xhr': 1, 'sid': self.sid, 'no_sidrenew': '', 'page': 'netDev'}
-        url = self.url + '/data.lua'
-        r = requests.post(url, data=data, allow_redirects=True)
-        j = r.json()
-        devices = []
-        for device in j['data']['active']:
-            devices.append((device['UID'], device['name'], True))
-        for device in j['data']['passive']:
-            devices.append((device['UID'], device['name'], False))
-        for device, name, active in sorted(devices, key=lambda x: x[1].lower()):
-            print("{:16} {}{}".format(device, name, "" if active else " [not active]"))
+    def print_devices(self):
+        print('\n{:16} {:16} {}'.format('DEVICE_ID', 'PROFILE_ID', 'DEVICE_NAME'))
+        for device in sorted(self.devices, key=lambda x: x['name'].lower()):
+            print('{:16} {:16} {}{}'.format(
+                device['id1'],
+                device['profile'] if device['profile'] else 'NONE',
+                device['name'],
+                '' if device['active'] else ' [NOT ACTIVE]'))
+
+    def print_profiles(self):
+        print('\n{:16} {}'.format('PROFILE_ID', 'PROFILE_NAME'))
+        for profile in self.profiles:
+            print("{:16} {}".format(profile['id'], profile['name']))
 
     def set_profiles(self, deviceProfiles):
+        print('\nUPDATING DEVICE PROFILES...')
         data = {'xhr': 1, 'sid': self.sid, 'apply': '', 'oldpage': '/internet/kids_userlist.lua'}
-        for device, profile in deviceProfiles:
-            print("CHANGING PROFILE OF {} TO {}".format(device, profile))
-            data['profile:' + device] = profile
-        url = self.url + '/data.lua'
-        requests.post(url, data=data, allow_redirects=True)
+        updates = 0
+        for device_id, profile_id in deviceProfiles:
+            device = self.get_device(device_id)
+            if not device:
+                print('  CANNOT IDENTIFY DEVICE {}'.format(device_id))
+                continue
+            profile = self.get_profile(profile_id)
+            if not profile:
+                print('  CANNOT IDENTIFY PROFILE {}'.format(profile_id))
+                continue
+            print('  CHANGING PROFILE OF {}/{} TO {}/{}'.format(
+                device_id, device['name'], profile_id, profile['name']))
+            if device['id2']:
+                device_id = device['id2']
+            updates += 1
+            data['profile:' + device_id] = profile_id
+        if updates > 0:
+            url = self.url + '/data.lua'
+            requests.post(url, data=data, allow_redirects=True)
 
 
 def parse_kv(s):
@@ -94,19 +192,17 @@ def main():
                         help='List all known devices')
     parser.add_argument('--list-profiles', dest='listprofiles', action='store_true',
                         help='List all available profiles')
-    parser.add_argument('deviceProfiles', nargs='*', metavar='DEVICE=PROFILE', type=parse_kv,
+    parser.add_argument('deviceProfiles', nargs='*', metavar='DEVICE=PROFILE',
+                        type=parse_kv,
                         help='Desired device to profile mapping')
     args = parser.parse_args()
 
     fps = FritzProfileSwitch(args.url, args.user, args.password)
     if args.listdevices:
-        print("QUERYING DEVICES...")
-        fps.get_available_devices()
+        fps.print_devices()
     if args.listprofiles:
-        print("QUERYING PROFILES...")
-        fps.get_available_profiles()
+        fps.print_profiles()
     if args.deviceProfiles:
-        print("UPDATING DEVICE PROFILES...")
         fps.set_profiles(args.deviceProfiles)
 
 
