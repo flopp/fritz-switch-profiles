@@ -12,6 +12,7 @@ import lxml.html
 import re
 import requests
 import sys
+import logging
 
 
 class FritzProfileSwitch:
@@ -32,7 +33,7 @@ class FritzProfileSwitch:
         return sid, challenge
 
     def login(self, user, password):
-        print("LOGGING IN TO FRITZ!BOX AT {}...".format(self.url))
+        logging.info("LOGGING IN TO FRITZ!BOX AT {}...".format(self.url))
         sid, challenge = self.get_sid_challenge(self.url + '/login_sid.lua')
         if sid == '0000000000000000':
             md5 = hashlib.md5()
@@ -47,7 +48,7 @@ class FritzProfileSwitch:
         return sid
 
     def fetch_device_profiles(self):
-        print('FETCHING DEVICE PROFILES...')
+        logging.info('FETCHING DEVICE PROFILES...')
         data = {'xhr': 1, 'sid': self.sid, 'cancel': '', 'oldpage': '/internet/kids_userlist.lua'}
         url = self.url + '/data.lua'
         r = requests.post(url, data=data, allow_redirects=True)
@@ -77,9 +78,9 @@ class FritzProfileSwitch:
                     multi = True
                 found = index
         if found < 0:
-            print('  NO MATCH FOR {:16} {}'.format(id2, name))
+            logging.info('  NO MATCH FOR {:16} {}'.format(id2, name))
         elif multi:
-            print('  MULTIPLE MATCHES FOR {:16} {}'.format(id2, name))
+            logging.info('  MULTIPLE MATCHES FOR {:16} {}'.format(id2, name))
         else:
             if self.devices[found]['id1'] != id2:
                 self.devices[found]['id2'] = id2
@@ -98,7 +99,7 @@ class FritzProfileSwitch:
         return None
 
     def fetch_devices(self):
-        print('FETCHING DEVICES...')
+        logging.info('FETCHING DEVICES...')
         data = {'xhr': 1, 'sid': self.sid, 'no_sidrenew': '', 'page': 'netDev'}
         url = self.url + '/data.lua'
         r = requests.post(url, data=data, allow_redirects=True)
@@ -122,7 +123,7 @@ class FritzProfileSwitch:
             })
 
     def fetch_profiles(self):
-        print('FETCHING AVAILABLE PROFILES...')
+        logging.info('FETCHING AVAILABLE PROFILES...')
         data = {'xhr': 1, 'sid': self.sid, 'no_sidrenew': '', 'page': 'kidPro'}
         url = self.url + '/data.lua'
         r = requests.post(url, data=data, allow_redirects=True)
@@ -136,6 +137,9 @@ class FritzProfileSwitch:
             profile_id = row.xpath('td[@class="btncolumn"]/button[@name="edit"]/@value')[0]
             self.profiles.append({'name': profile_name, 'id': profile_id})
 
+    def get_devices(self):
+        return sorted(self.devices, key=lambda x: x['name'].lower())
+
     def print_devices(self):
         print('\n{:16} {:16} {}'.format('DEVICE_ID', 'PROFILE_ID', 'DEVICE_NAME'))
         for device in sorted(self.devices, key=lambda x: x['name'].lower()):
@@ -145,25 +149,28 @@ class FritzProfileSwitch:
                 device['name'],
                 '' if device['active'] else ' [NOT ACTIVE]'))
 
+    def get_profiles(self):
+        return self.profiles
+
     def print_profiles(self):
         print('\n{:16} {}'.format('PROFILE_ID', 'PROFILE_NAME'))
         for profile in self.profiles:
             print("{:16} {}".format(profile['id'], profile['name']))
 
     def set_profiles(self, deviceProfiles):
-        print('\nUPDATING DEVICE PROFILES...')
+        logging.info('\nUPDATING DEVICE PROFILES...')
         data = {'xhr': 1, 'sid': self.sid, 'apply': '', 'oldpage': '/internet/kids_userlist.lua'}
         updates = 0
         for device_id, profile_id in deviceProfiles:
             device = self.get_device(device_id)
             if not device:
-                print('  CANNOT IDENTIFY DEVICE {}'.format(device_id))
+                logging.error('  CANNOT IDENTIFY DEVICE {}'.format(device_id))
                 continue
             profile = self.get_profile(profile_id)
             if not profile:
-                print('  CANNOT IDENTIFY PROFILE {}'.format(profile_id))
+                logging.error('  CANNOT IDENTIFY PROFILE {}'.format(profile_id))
                 continue
-            print('  CHANGING PROFILE OF {}/{} TO {}/{}'.format(
+            logging.info('  CHANGING PROFILE OF {}/{} TO {}/{}'.format(
                 device_id, device['name'], profile_id, profile['name']))
             if device['id2']:
                 device_id = device['id2']
@@ -210,9 +217,9 @@ if __name__ == '__main__':
     try:
         main()
     except requests.exceptions.ConnectionError as e:
-        print('Failed to connect to Fritz!Box')
-        print(e)
+        logging.error('Failed to connect to Fritz!Box')
+        logging.error(e)
         sys.exit(1)
     except PermissionError as e:
-        print(e)
+        logging.error(e)
         sys.exit(1)
