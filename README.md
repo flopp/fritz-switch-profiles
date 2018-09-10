@@ -87,6 +87,29 @@ UPDATING DEVICE PROFILES...
 
 Note that you may change the profiles of multiple devices at once by supplying multiple `DEVICE=PROFILE` pairs on the command line.
 
+## Usage as a library
+
+From [example.py](examples/example.py)
+
+```python
+from fritz_switch_profiles import FritzProfileSwitch
+
+url = 'http://fritz.box'
+user = ''
+password = 'mysecurepassword'
+
+fps = FritzProfileSwitch(url, user, password)
+devices = fps.get_devices()
+profiles = fps.get_profiles()
+
+fps.print_devices()
+fps.print_profiles()
+
+profile_for_device = [devices[0]['id1'], profiles[2]['id']]
+
+fps.set_profiles(profile_for_device)
+```
+
 ## Known Issues
 
 - Non-uniquely named devices may confuse the script.
