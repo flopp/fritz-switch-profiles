@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="fritz-switch-profiles",
-    version="0.0.2",
+    version="1.0.0",
     author="Kevin Eifinger",
     author_email="k.eifinger@googlemail.com",
     description="A (Python) script to remotely set device profiles of an AVM Fritz!Box",
