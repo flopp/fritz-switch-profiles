@@ -52,7 +52,7 @@ class FritzProfileSwitch:
         data = {'xhr': 1, 'sid': self.sid, 'cancel': '', 'oldpage': '/internet/kids_userlist.lua'}
         url = self.url + '/data.lua'
         r = requests.post(url, data=data, allow_redirects=True)
-        html = lxml.html.fromstring(r.content)
+        html = lxml.html.fromstring(r.text)
         for row in html.xpath('//table[@id="uiDevices"]/tr'):
             td = row.xpath('td')
             if (not td) or (len(td) != 5):
@@ -127,7 +127,7 @@ class FritzProfileSwitch:
         data = {'xhr': 1, 'sid': self.sid, 'no_sidrenew': '', 'page': 'kidPro'}
         url = self.url + '/data.lua'
         r = requests.post(url, data=data, allow_redirects=True)
-        html = lxml.html.fromstring(r.content)
+        html = lxml.html.fromstring(r.text)
         self.profiles = []
         for row in html.xpath('//table[@id="uiProfileList"]/tr'):
             profile_name = row.xpath('td[@class="name"]/span/text()')
