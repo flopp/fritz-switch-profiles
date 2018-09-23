@@ -17,9 +17,9 @@ install:
   - pip install -r requirements-dev.txt
 
 script:
-  - python -m compileall fritz-switch-profiles.py
-  - flake8 fritz-switch-profiles.py
-  - codespell fritz-switch-profiles.py
+  - python -m compileall fritz-switch-profiles/fritz-switch-profiles.py
+  - flake8 fritz-switch-profiles/fritz-switch-profiles.py
+  - codespell fritz-switch-profiles/fritz-switch-profiles.py
 
 deploy:
   provider: pypi
